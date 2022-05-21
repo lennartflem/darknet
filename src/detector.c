@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <sys/stat.h>
 #include "darknet.h"
 #include "network.h"
 #include "region_layer.h"
@@ -1661,8 +1662,23 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     }
     int j;
     float nms = .45;    // 0.4F
+
+    struct stat st;
+    int ispipe = (stat(filename,&st)==0 && S_ISFIFO(st.st_mode));
+    if (ispipe) freopen(filename,"r",stdin);
+
     while (1) {
-        if (filename) {
+        if (ispipe) {
+            for (;;) {
+                if (!fgets(input, 256, stdin)) {
+                    usleep(100000);
+                    clearerr(stdin);
+                }
+                else break;
+            }
+            strtok(input, "\n");
+        }
+        else if (filename) {
             strncpy(input, filename, 256);
             if (strlen(input) > 0)
                 if (input[strlen(input) - 1] == 0x0d) input[strlen(input) - 1] = 0;
@@ -1725,6 +1741,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
             json_buf = detection_to_json(dets, nboxes, l.classes, names, json_image_id, input);
 
             fwrite(json_buf, sizeof(char), strlen(json_buf), json_file);
+            fflush(json_file);
             free(json_buf);
         }
 
@@ -1763,7 +1780,7 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
             destroy_all_windows_cv();
         }
 
-        if (filename) break;
+        if (filename && !ispipe) break;
     }
 
     if (json_file) {
