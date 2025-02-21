@@ -1666,19 +1666,24 @@ void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filenam
     struct stat st;
     int ispipe = (stat(filename,&st)==0 && S_ISFIFO(st.st_mode));
     if (ispipe) freopen(filename,"r",stdin);
-
     while (1) {
+	printf("IF: filename=%d ispipe=%d\n",filename,ispipe);
         if (ispipe) {
+            int tries = 0;
             for (;;) {
                 if (!fgets(input, 256, stdin)) {
-                    usleep(100000);
+                    usleep(100*1000); // 0.1s
                     clearerr(stdin);
+                    tries++;
                 }
-                else break;
+                else {
+                    if (tries) fprintf(stderr,"got input after %d polls\n",tries);
+                    break;
+                }
             }
             strtok(input, "\n");
         }
-        else if (filename) {
+        else if (filename!=NULL) {
             strncpy(input, filename, 256);
             if (strlen(input) > 0)
                 if (input[strlen(input) - 1] == 0x0d) input[strlen(input) - 1] = 0;
